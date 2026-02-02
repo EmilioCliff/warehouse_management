@@ -132,13 +132,13 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "Stock Entry": {
+        "on_submit": "warehouse_management.warehouse_management.stock_management.stateless_stock_ledger.create_ledger_entries",
+        # "on_cancel": "method",
+        # "on_trash": "method",
+    }
+}
 
 # Scheduled Tasks
 # ---------------
@@ -249,4 +249,3 @@ app_license = "mit"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

@@ -3,6 +3,8 @@
 
 import frappe
 from frappe import _
+from frappe.query_builder import DocType
+from frappe.query_builder.functions import Sum
 
 from warehouse_management.warehouse_management.stock_management.stock_valuation import (
     get_moving_average_rate,
@@ -57,34 +59,26 @@ def get_stock_balance():
     """Get stock balance data without filters."""
     as_on_date = frappe.utils.today()
 
-    # Execute query - include warehouse to calculate valuation per warehouse
-    query = """
-        SELECT 
-            sle.item_code,
-            item.item_name,
-            sle.warehouse,
-            SUM(sle.quantity) as balance_qty
-        FROM 
-            `tabStateless Stock Ledger Entry` sle
-        LEFT JOIN
-            `tabItem` item ON sle.item_code = item.name
-        WHERE 
-            sle.posting_date <= %(as_on_date)s
-        GROUP BY 
-            sle.item_code, item.item_name, sle.warehouse
-        HAVING
-            SUM(sle.quantity) != 0
-        ORDER BY
-            sle.item_code
-    """
+    ssle = DocType("Stateless Stock Ledger Entry")
+    item = DocType("Item")
+    balance_qty = Sum(ssle.quantity).as_("balance_qty")
 
-    params = {
-        "as_on_date": as_on_date,
-    }
+    q = (
+        frappe.qb.from_(ssle)
+        .select(ssle.item_code, item.item_name, ssle.warehouse, balance_qty)
+        .left_join(item)
+        .on(ssle.item_code == item.name)
+        .where(ssle.posting_date <= as_on_date)
+        .groupby(ssle.item_code, item.item_name, ssle.warehouse)
+        .having(Sum(ssle.quantity) != 0)
+        .orderby(ssle.item_code)
+    )
 
-    balance_data = frappe.db.sql(query, params, as_dict=True)
+    print(q.get_sql())
+    print(q.walk())
 
-    # Calculate valuation metrics for each warehouse
+    balance_data = q.run(as_dict=True)
+
     for row in balance_data:
         row.valuation_rate = get_moving_average_rate(
             row.item_code, row.warehouse, as_on_date
